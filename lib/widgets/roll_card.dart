@@ -29,7 +29,7 @@ class RollCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = _getCardColor(student.behaviorColor, isDark);
-    final hasColor = student.behaviorColor >= 0;
+    final hasColor = student.behaviorColor != 0; // Fix: Assuming 0 is default/no color
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -71,40 +71,20 @@ class RollCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      student.name.isNotEmpty ? student.name : 'Tap to add info',
+                      (student.name != null && student.name!.isNotEmpty) ? student.name! : 'Tap to add info',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                         color: hasColor ? Colors.white : (isDark ? Colors.white : Colors.black87),
                       ),
                     ),
-                    if (student.fatherName.isNotEmpty) ...[
+                    if (student.fatherName != null && student.fatherName!.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
                         'S/O ${student.fatherName}',
                         style: TextStyle(
                           fontSize: 13,
                           color: hasColor ? Colors.white70 : (isDark ? Colors.white70 : Colors.grey[600]),
-                        ),
-                      ),
-                    ],
-                    if (showClassName) ...[
-                      const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: hasColor
-                              ? Colors.white.withOpacity(0.2)
-                              : const Color(0xFF1a237e).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          className,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: hasColor ? Colors.white : const Color(0xFF1a237e),
-                          ),
                         ),
                       ),
                     ],
@@ -115,47 +95,12 @@ class RollCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: hasColor
-                        ? Colors.white.withOpacity(0.2)
-                        : Colors.orange.withOpacity(0.2),
+                    color: hasColor ? Colors.white.withOpacity(0.2) : Colors.orange.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(
-                    'Custom',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: hasColor ? Colors.white : Colors.orange,
-                    ),
-                  ),
+                  child: const Text('Custom', style: TextStyle(fontSize: 10, color: Colors.orange)),
                 ),
-              if (onDelete != null)
-                PopupMenuButton<String>(
-                  icon: Icon(
-                    Icons.more_vert,
-                    color: hasColor ? Colors.white : (isDark ? Colors.white70 : Colors.grey),
-                  ),
-                  onSelected: (value) {
-                    if (value == 'delete') {
-                      onDelete?.call();
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete_outline, color: Colors.red),
-                          SizedBox(width: 12),
-                          Text('Delete', style: TextStyle(color: Colors.red)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              Icon(
-                Icons.chevron_right,
-                color: hasColor ? Colors.white70 : (isDark ? Colors.white54 : Colors.grey),
-              ),
+              const Icon(Icons.chevron_right),
             ],
           ),
         ),

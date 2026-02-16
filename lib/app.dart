@@ -11,9 +11,6 @@ import 'screens/lock_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/class_screen.dart';
 import 'screens/student_screen.dart';
-import 'screens/settings_screen.dart';
-import 'screens/export_screen.dart';
-import 'screens/filter_screen.dart';
 
 class EVApp extends StatelessWidget {
   const EVApp({super.key});
@@ -32,7 +29,6 @@ class EVApp extends StatelessWidget {
           supportedLocales: const [
             Locale('en', 'US'),
             Locale('ur', 'PK'),
-            Locale('ur', 'Roman'),
           ],
           localizationsDelegates: [
             AppLocalizations.delegate,
@@ -45,9 +41,7 @@ class EVApp extends StatelessWidget {
             '/splash': (context) => const SplashScreen(),
             '/lock': (context) => const LockScreen(),
             '/home': (context) => const HomeScreen(),
-            '/settings': (context) => const SettingsScreen(),
-            '/export': (context) => const ExportScreen(),
-            '/filter': (context) => const FilterScreen(),
+            // Missing screens routes removed to prevent build errors
           },
           onGenerateRoute: (settings) {
             if (settings.name == '/class') {

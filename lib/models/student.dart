@@ -30,6 +30,12 @@ class Student {
   })  : createdAt = createdAt ?? DateTime.now().toIso8601String(),
         updatedAt = updatedAt ?? DateTime.now().toIso8601String();
 
+  // FIX 1: Missing fromMap (Database isko dhoond raha hai)
+  factory Student.fromMap(Map<String, dynamic> map) => Student.fromJson(map);
+
+  // FIX 2: Missing isCustom getter (Roll Card isko dhoond raha hai)
+  bool get isCustom => false; 
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'classId': classId,
@@ -48,7 +54,7 @@ class Student {
 
   factory Student.fromJson(Map<String, dynamic> json) => Student(
         id: json['id'] as int?,
-        classId: json['classId'] as int,
+        classId: json['classId'] is String ? int.parse(json['classId']) : json['classId'] as int,
         rollNumber: json['rollNumber'] as int,
         name: json['name'] as String?,
         fatherName: json['fatherName'] as String?,
@@ -108,18 +114,12 @@ Comment: ${comments ?? 'N/A'}''';
 
   String _getColorName(int color) {
     switch (color) {
-      case 0xFF4CAF50:
-        return 'Excellent';
-      case 0xFF2196F3:
-        return 'Good';
-      case 0xFFFFEB3B:
-        return 'Average';
-      case 0xFFFF9800:
-        return 'Needs Improvement';
-      case 0xFFF44336:
-        return 'Critical';
-      default:
-        return 'Not Set';
+      case 0xFF4CAF50: return 'Excellent';
+      case 0xFF2196F3: return 'Good';
+      case 0xFFFFEB3B: return 'Average';
+      case 0xFFFF9800: return 'Needs Improvement';
+      case 0xFFF44336: return 'Critical';
+      default: return 'Not Set';
     }
   }
 }
