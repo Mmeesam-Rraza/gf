@@ -20,14 +20,20 @@ class ShareService {
     buffer.writeln('━━━━━━━━━━━━━━━━━━━━');
     buffer.writeln('🏫 Class: $className');
     buffer.writeln('🔢 Roll Number: ${student.rollNumber}');
-    buffer.writeln('👤 Name: ${student.name.isEmpty ? "N/A" : student.name}');
-    buffer.writeln('👨 Father: ${student.fatherName.isEmpty ? "N/A" : student.fatherName}');
-    buffer.writeln('📱 Contact: ${student.contact.isEmpty ? "N/A" : student.contact}');
-    buffer.writeln('📍 Address: ${student.address.isEmpty ? "N/A" : student.address}');
+    
+    // FIX: Null safety checks added
+    buffer.writeln('👤 Name: ${(student.name?.isEmpty ?? true) ? "N/A" : student.name}');
+    buffer.writeln('👨 Father: ${(student.fatherName?.isEmpty ?? true) ? "N/A" : student.fatherName}');
+    buffer.writeln('📱 Contact: ${(student.contact?.isEmpty ?? true) ? "N/A" : student.contact}');
+    buffer.writeln('📍 Address: ${(student.address?.isEmpty ?? true) ? "N/A" : student.address}');
+    
     buffer.writeln('📊 Status: ${_getBehaviorName(student.behaviorColor)}');
-    if (student.comments.isNotEmpty) {
+    
+    // FIX: Null safety for comments
+    if (student.comments != null && student.comments!.isNotEmpty) {
       buffer.writeln('💬 Comments: ${student.comments}');
     }
+    
     buffer.writeln('━━━━━━━━━━━━━━━━━━━━');
     buffer.writeln('Sent via EV App');
     return buffer.toString();

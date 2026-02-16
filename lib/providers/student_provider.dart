@@ -24,11 +24,9 @@ class StudentProvider extends ChangeNotifier {
 
   List<Student> get _filteredStudents {
     List<Student> filtered = _currentClassStudents;
-    
     if (_selectedColorFilter >= 0) {
       filtered = filtered.where((s) => s.behaviorColor == _selectedColorFilter).toList();
     }
-    
     if (_searchQuery.isNotEmpty) {
       filtered = filtered.where((s) =>
         (s.name?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false) ||
@@ -36,7 +34,6 @@ class StudentProvider extends ChangeNotifier {
         (s.fatherName?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false)
       ).toList();
     }
-    
     return filtered;
   }
 
@@ -65,6 +62,14 @@ class StudentProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> loadStudentByRoll(int classId, int rollNumber) async {
+    _isLoading = true;
+    notifyListeners();
+    _currentStudent = await _db.getStudent(classId, rollNumber);
+    _isLoading = false;
+    notifyListeners();
+  }
+
   Future<bool> saveStudent(Student student) async {
     try {
       _isLoading = true;
@@ -87,14 +92,45 @@ class StudentProvider extends ChangeNotifier {
     }
   }
 
-  void setSearchQuery(String query) {
-    _searchQuery = query;
-    notifyListeners();
+  Future<bool> deleteRollNumber(int classId, int rollNumber) async {
+    try {
+      _isLoading = true;
+      notifyListeners();
+      await _db.deleteRollNumber(classId, rollNumber);
+      await loadStudentsByClass(classId);
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
   }
 
-  // Other methods remain the same...
-  void clearCurrentStudent() {
-    _currentStudent = null;
-    notifyListeners();
+  Future<bool> addCustomRollNumber(int classId) async {
+    try {
+      final customCount = await _db.getCustomRollCount(classId);
+      if (customCount >= 5) return false;
+      _isLoading = true;
+      notifyListeners();
+      final nextRoll = await _db.getNextCustomRollNumber(classId);
+      await _db.addCustomRollNumber(classId, nextRoll);
+      await loadStudentsByClass(classId);
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
   }
+
+  Future<int> getCustomRollCount(int classId) async => await _db.getCustomRollCount(classId);
+  void setColorFilter(int index) { _selectedColorFilter = index; notifyListeners(); }
+  void clearColorFilter() { _selectedColorFilter = -1; notifyListeners(); }
+  void setSearchQuery(String q) { _searchQuery = q; notifyListeners(); }
+  void clearSearch() { _searchQuery = ''; notifyListeners(); }
+  void clearCurrentStudent() { _currentStudent = null; notifyListeners(); }
 }

@@ -1,178 +1,144 @@
-import 'dart:convert';
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
+import 'package:flutter/material.dart';
+import '../database/database_helper.dart';
 import '../models/student.dart';
-import '../config/app_config.dart';
+import '../models/class_model.dart';
 
-class ExportService {
-  static Future<String> exportToJson(Map<String, dynamic> data, String fileName) async {
-    final directory = await getApplicationDocumentsDirectory();
-    final file = File('${directory.path}/$fileName.json');
-    await file.writeAsString(jsonEncode(data));
-    return file.path;
-  }
+class StudentProvider extends ChangeNotifier {
+  final DatabaseHelper _db = DatabaseHelper.instance;
+  
+  List<ClassModel> _classes = [];
+  List<Student> _currentClassStudents = [];
+  Student? _currentStudent;
+  int? _currentClassId;
+  int _selectedColorFilter = -1;
+  bool _isLoading = false;
+  String _searchQuery = '';
 
-  static Future<String> exportStudentToJson(Student student, String className) async {
-    final data = {
-      'exportDate': DateTime.now().toIso8601String(),
-      'className': className,
-      'student': student.toJson(),
-    };
-    return await exportToJson(data, 'student_${student.rollNumber}_export');
-  }
+  List<ClassModel> get classes => _classes;
+  List<Student> get currentClassStudents => _filteredStudents;
+  Student? get currentStudent => _currentStudent;
+  int? get currentClassId => _currentClassId;
+  int get selectedColorFilter => _selectedColorFilter;
+  bool get isLoading => _isLoading;
+  String get searchQuery => _searchQuery;
 
-  static Future<String> exportStudentToPdf(Student student, String className) async {
-    final pdf = pw.Document();
-
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Header(
-                level: 0,
-                child: pw.Text('Student Information',
-                    style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
-              ),
-              pw.SizedBox(height: 20),
-              _buildPdfRow('Class', className),
-              _buildPdfRow('Roll Number', '${student.rollNumber}'),
-              _buildPdfRow('Name', student.name.isEmpty ? 'N/A' : student.name),
-              _buildPdfRow('Father Name', student.fatherName.isEmpty ? 'N/A' : student.fatherName),
-              _buildPdfRow('Contact', student.contact.isEmpty ? 'N/A' : student.contact),
-              _buildPdfRow('Address', student.address.isEmpty ? 'N/A' : student.address),
-              _buildPdfRow('Behavior', _getBehaviorName(student.behaviorColor)),
-              _buildPdfRow('Comments', student.comments.isEmpty ? 'N/A' : student.comments),
-              pw.SizedBox(height: 30),
-              pw.Text(
-                'Generated on: ${DateTime.now().toString().split('.')[0]}',
-                style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-
-    final directory = await getApplicationDocumentsDirectory();
-    final file = File('${directory.path}/student_${student.rollNumber}.pdf');
-    await file.writeAsBytes(await pdf.save());
-    return file.path;
-  }
-
-  static Future<String> exportClassToPdf(Map<String, dynamic> data) async {
-    final pdf = pw.Document();
-    final className = data['class']['name'] ?? 'Unknown';
-    final students = (data['students'] as List).map((s) => Student.fromMap(s)).toList();
-
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        build: (pw.Context context) {
-          return [
-            pw.Header(
-              level: 0,
-              child: pw.Text('Class Report: $className',
-                  style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
-            ),
-            pw.SizedBox(height: 20),
-            pw.Text('Total Students: ${students.length}'),
-            pw.SizedBox(height: 20),
-            pw.Table.fromTextArray(
-              headers: ['Roll', 'Name', 'Father', 'Contact', 'Status'],
-              data: students.map((s) => [
-                '${s.rollNumber}',
-                s.name.isEmpty ? '-' : s.name,
-                s.fatherName.isEmpty ? '-' : s.fatherName,
-                s.contact.isEmpty ? '-' : s.contact,
-                _getBehaviorName(s.behaviorColor),
-              ]).toList(),
-            ),
-          ];
-        },
-      ),
-    );
-
-    final directory = await getApplicationDocumentsDirectory();
-    final file = File('${directory.path}/class_${className}_report.pdf');
-    await file.writeAsBytes(await pdf.save());
-    return file.path;
-  }
-
-  static Future<String> exportAllToPdf(Map<String, dynamic> data) async {
-    final pdf = pw.Document();
-    final classes = data['classes'] as List;
-    final students = (data['students'] as List).map((s) => Student.fromMap(s)).toList();
-
-    for (var classData in classes) {
-      final classId = classData['id'];
-      final className = classData['name'];
-      final classStudents = students.where((s) => s.classId == classId).toList();
-
-      pdf.addPage(
-        pw.MultiPage(
-          pageFormat: PdfPageFormat.a4,
-          build: (pw.Context context) {
-            return [
-              pw.Header(
-                level: 0,
-                child: pw.Text('Class: $className',
-                    style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
-              ),
-              pw.SizedBox(height: 10),
-              pw.Text('Students: ${classStudents.length}'),
-              pw.SizedBox(height: 10),
-              pw.Table.fromTextArray(
-                headers: ['Roll', 'Name', 'Father', 'Contact', 'Status'],
-                data: classStudents.map((s) => [
-                  '${s.rollNumber}',
-                  s.name.isEmpty ? '-' : s.name,
-                  s.fatherName.isEmpty ? '-' : s.fatherName,
-                  s.contact.isEmpty ? '-' : s.contact,
-                  _getBehaviorName(s.behaviorColor),
-                ]).toList(),
-              ),
-            ];
-          },
-        ),
-      );
+  List<Student> get _filteredStudents {
+    List<Student> filtered = _currentClassStudents;
+    
+    if (_selectedColorFilter >= 0) {
+      filtered = filtered.where((s) => s.behaviorColor == _selectedColorFilter).toList();
     }
-
-    final directory = await getApplicationDocumentsDirectory();
-    final file = File('${directory.path}/full_export_${DateTime.now().millisecondsSinceEpoch}.pdf');
-    await file.writeAsBytes(await pdf.save());
-    return file.path;
-  }
-
-  static pw.Widget _buildPdfRow(String label, String value) {
-    return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(vertical: 8),
-      child: pw.Row(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.SizedBox(
-            width: 120,
-            child: pw.Text(
-              '$label:',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-            ),
-          ),
-          pw.Expanded(
-            child: pw.Text(value),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static String _getBehaviorName(int colorIndex) {
-    if (colorIndex >= 0 && colorIndex < AppConfig.behaviorColors.length) {
-      return AppConfig.behaviorColors[colorIndex].name;
+    
+    if (_searchQuery.isNotEmpty) {
+      filtered = filtered.where((s) =>
+        (s.name?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false) ||
+        s.rollNumber.toString().contains(_searchQuery) ||
+        (s.fatherName?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false)
+      ).toList();
     }
-    return 'Not Set';
+    
+    return filtered;
   }
+
+  Future<void> loadClasses() async {
+    _isLoading = true;
+    notifyListeners();
+    _classes = await _db.getAllClasses();
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  Future<void> loadStudentsByClass(int classId) async {
+    _isLoading = true;
+    _currentClassId = classId;
+    notifyListeners();
+    _currentClassStudents = await _db.getStudentsByClass(classId);
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  Future<void> loadStudent(int studentId) async {
+    _isLoading = true;
+    notifyListeners();
+    _currentStudent = await _db.getStudentById(studentId);
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  // Screens are looking for this
+  Future<void> loadStudentByRoll(int classId, int rollNumber) async {
+    _isLoading = true;
+    notifyListeners();
+    _currentStudent = await _db.getStudent(classId, rollNumber);
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  Future<bool> saveStudent(Student student) async {
+    try {
+      _isLoading = true;
+      notifyListeners();
+      if (student.id != null) {
+        await _db.updateStudent(student);
+      } else {
+        await _db.insertStudent(student);
+      }
+      if (_currentClassId != null) {
+        await loadStudentsByClass(_currentClassId!);
+      }
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> deleteRollNumber(int classId, int rollNumber) async {
+    try {
+      _isLoading = true;
+      notifyListeners();
+      await _db.deleteRollNumber(classId, rollNumber);
+      await loadStudentsByClass(classId);
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> addCustomRollNumber(int classId) async {
+    try {
+      final customCount = await _db.getCustomRollCount(classId);
+      if (customCount >= 5) return false;
+      _isLoading = true;
+      notifyListeners();
+      final nextRoll = await _db.getNextCustomRollNumber(classId);
+      await _db.addCustomRollNumber(classId, nextRoll);
+      await loadStudentsByClass(classId);
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<int> getCustomRollCount(int classId) async => await _db.getCustomRollCount(classId);
+  void setColorFilter(int index) { _selectedColorFilter = index; notifyListeners(); }
+  void clearColorFilter() { _selectedColorFilter = -1; notifyListeners(); }
+  void setSearchQuery(String query) { _searchQuery = query; notifyListeners(); }
+  void clearSearch() { _searchQuery = ''; notifyListeners(); }
+  void clearCurrentStudent() { _currentStudent = null; notifyListeners(); }
+
+  Future<List<Student>> getStudentsByColor(int colorIndex) async => await _db.getAllStudentsByColor(colorIndex);
+  Future<Map<String, dynamic>> exportAllData() async => await _db.exportAllData();
+  Future<Map<String, dynamic>> exportClassData(int classId) async => await _db.exportClassData(classId);
 }
